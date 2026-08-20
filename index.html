@@ -1402,25 +1402,50 @@ const ASSETS = {
     ctx.ellipse(48, 4, 24, 8, 0, 0, Math.PI*2);
     ctx.fill();
 
-    // Rider (Dayana)
+    // Rider (Dayana) — tricou maro, fustă de blugi, balerini negri
     const bob = (player.jumping||flyMode) ? -6 : Math.sin(player.legPhase*2)*1.5;
     ctx.save();
     ctx.translate(46, -6 + bob);
-    // legs over dog
-    ctx.strokeStyle = '#2E2452';
-    ctx.lineWidth = 7;
-    ctx.lineCap='round';
+
+    // bare legs (skin tone), from under the skirt down to the shoes
+    ctx.strokeStyle = '#E3AD7F';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-6, 6); ctx.lineTo(-14, 20);
-    ctx.moveTo(10, 6); ctx.lineTo(18, 20);
+    ctx.moveTo(-6, 8); ctx.lineTo(-11, 21);
+    ctx.moveTo(8, 8); ctx.lineTo(13, 21);
     ctx.stroke();
-    // torso
-    ctx.fillStyle = '#F26B5E';
+
+    // black ballet flats
+    ctx.fillStyle = '#1F1730';
     ctx.beginPath();
-    ctx.roundRect(-12, -20, 24, 26, 10);
+    ctx.ellipse(-12, 22, 6, 3.2, 0.15, 0, Math.PI*2);
     ctx.fill();
-    // arms (one raised, cheering)
-    ctx.strokeStyle = '#F26B5E';
+    ctx.beginPath();
+    ctx.ellipse(14, 22, 6, 3.2, -0.15, 0, Math.PI*2);
+    ctx.fill();
+
+    // blue denim skirt (flares out from waist to hem)
+    ctx.fillStyle = '#3E6AA8';
+    ctx.beginPath();
+    ctx.moveTo(-10, -2);
+    ctx.lineTo(10, -2);
+    ctx.lineTo(15, 11);
+    ctx.lineTo(-15, 11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#2E4F80';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // torso — brown t-shirt
+    ctx.fillStyle = '#8B5A3C';
+    ctx.beginPath();
+    ctx.roundRect(-12, -20, 24, 20, 8);
+    ctx.fill();
+
+    // arms (one raised, cheering) — same brown as the t-shirt
+    ctx.strokeStyle = '#8B5A3C';
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(-10, -12); ctx.lineTo(-22, -26);
