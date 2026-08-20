@@ -898,8 +898,24 @@ const ASSETS = {
     norbertVisibleTimer = 0;
   }
 
+  // 🔊 sunet real de drujbă — pune fișierul "chainsaw.mp3" în același folder cu
+  // index.html pe GitHub, cu exact acest nume, și se va folosi automat.
+  // Dacă fișierul lipsește, jocul revine automat la sunetul generat.
+  const mariusSoundFile = new Audio('chainsaw.mp3');
+  mariusSoundFile.preload = 'auto';
+
+  function playMariusSound(){
+    try {
+      mariusSoundFile.currentTime = 0;
+      const p = mariusSoundFile.play();
+      if(p && p.catch) p.catch(()=> chainsawRingtone());
+    } catch(e){
+      chainsawRingtone();
+    }
+  }
+
   function showMarius(){
-    chainsawRingtone();
+    playMariusSound();
     mariusBubble.textContent = 'Scuze! Nevastă! 📞';
     const top = 60 + Math.random()*40;
     mariusAvatar.style.right = '8px';
@@ -910,7 +926,7 @@ const ASSETS = {
     mariusBubble.style.top = (top-6) + 'px';
     mariusAvatar.style.opacity = '1';
     mariusBubble.style.opacity = '1';
-    mariusVisibleTimer = 150;
+    mariusVisibleTimer = 220;
   }
   function hideMarius(){
     mariusAvatar.style.opacity = '0';
