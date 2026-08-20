@@ -190,6 +190,41 @@
   }
   .hidden{display:none !important;}
 
+  .win-photo{
+    position:relative;
+    width:150px;
+    height:150px;
+    margin:0 auto 10px;
+  }
+  .win-photo img{
+    position:absolute;
+    border-radius:50%;
+    object-fit:cover;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);
+  }
+  #winDayanaImg{
+    width:140px;
+    height:140px;
+    left:0; top:0;
+    border:4px solid var(--gold);
+    opacity:0;
+    transform:scale(.4);
+    animation:winPhotoPop .6s cubic-bezier(.3,1.5,.5,1) .15s forwards;
+  }
+  #winBrunoImg{
+    width:64px;
+    height:64px;
+    right:-6px;
+    bottom:-6px;
+    border:3px solid var(--coral);
+    opacity:0;
+    transform:scale(.4);
+    animation:winPhotoPop .55s cubic-bezier(.3,1.5,.5,1) .5s forwards;
+  }
+  @keyframes winPhotoPop{
+    to{ opacity:1; transform:scale(1); }
+  }
+
   .msgwall{
     width:100%;
     max-width:420px;
@@ -289,6 +324,28 @@
   @keyframes confettiFall{
     0%{ transform:translateY(0) rotate(0deg); opacity:1; }
     100%{ transform:translateY(340px) rotate(560deg); opacity:0; }
+  }
+  .wish-piece{
+    position:absolute;
+    bottom:-10px;
+    font-family:'Baloo 2';
+    font-weight:700;
+    font-size:13px;
+    color:var(--gold);
+    text-shadow:0 2px 6px rgba(0,0,0,.6);
+    opacity:0;
+    animation-name:wishFloat;
+    animation-timing-function:ease-out;
+    animation-fill-mode:forwards;
+    z-index:2;
+    pointer-events:none;
+    white-space:nowrap;
+  }
+  @keyframes wishFloat{
+    0%{ transform:translateY(0) scale(.8); opacity:0; }
+    15%{ opacity:1; transform:translateY(-20px) scale(1); }
+    85%{ opacity:1; }
+    100%{ transform:translateY(-260px) scale(1.05); opacity:0; }
   }
   .chair-parade{
     position:absolute; bottom:10px; left:0; right:0;
@@ -462,6 +519,10 @@
       <div class="win-scrim"></div>
       <div class="confetti-layer" id="confettiLayer"></div>
       <div class="win-content">
+        <div class="win-photo">
+          <img id="winDayanaImg" src="" alt="Dayana">
+          <img id="winBrunoImg" src="" alt="Bruno">
+        </div>
         <div class="badge">Ai ajuns la timp! 🎉</div>
         <h1>SURPRIZĂ! La mulți ani! 🎂🎈</h1>
         <p class="sub" id="winScore">Toată lumea te așteaptă la petrecere, chiar acolo, la noua fabrică Komoder din Mera!</p>
@@ -794,6 +855,7 @@ const ASSETS = {
   let flashAlpha = 0;   // red flash after a collision
   let invuln = 0;        // brief grace period after using a "continue"
   let continuesUsed = 0;
+  let finishTimer = 0;
   const MAX_CONTINUES = 2;
 
   const player = {
@@ -882,6 +944,7 @@ const ASSETS = {
     flashAlpha = 0;
     invuln = 0;
     continuesUsed = 0;
+    finishTimer = 0;
     player.y = groundY;
     player.vy = 0;
     player.jumping = false;
@@ -915,6 +978,7 @@ const ASSETS = {
     startOverlay.classList.add('hidden');
     gameOverOverlay.classList.add('hidden');
     winOverlay.classList.add('hidden');
+    try { winSongFile.pause(); winSongFile.currentTime = 0; } catch(e){}
     startMusic();
   }
 
@@ -989,12 +1053,49 @@ const ASSETS = {
     });
   }
 
+  function triggerFinish(){
+    state = 'finish';
+    finishTimer = 70;
+    obstacles = [];
+    drops = [];
+    specials = [];
+    restingSpecial = null;
+    spawnParticles(W*0.5, groundY - 60, '#F2C14E', 30);
+    spawnParticles(W*0.3, groundY - 90, '#F26B5E', 18);
+    spawnParticles(W*0.7, groundY - 90, '#3AAFA9', 18);
+    fanfare();
+  }
+
+  function launchWishes(){
+    const layer = document.getElementById('confettiLayer');
+    const phrases = [
+      'La mulți ani! 🎉',
+      'Fericită să te avem! 💛',
+      'Cel mai tare an urmează! ✨',
+      'Toată lumea te iubește! 🥳',
+      'La mai mare, Dayana! 🎂',
+      'Fii mereu așa! 🌟'
+    ];
+    phrases.forEach((txt, i)=>{
+      const el = document.createElement('div');
+      el.className = 'wish-piece';
+      el.textContent = txt;
+      el.style.left = (8 + Math.random()*78) + '%';
+      el.style.animationDuration = (3.4 + Math.random()*1.3) + 's';
+      el.style.animationDelay = (i*0.35 + Math.random()*0.3) + 's';
+      layer.appendChild(el);
+    });
+  }
+
   function win(){
     state = 'won';
-    fanfare();
+    playWinSong();
     winScore.textContent = 'Scor final: ' + Math.floor(score) + ' • ' + obstaclesCleared + ' fotolii sărite. Ai ajuns exact la timp — toți te așteaptă la petrecerea ta! 🥳';
     document.getElementById('winBg').style.backgroundImage = "url('" + ASSETS.factory + "')";
+    document.getElementById('winDayanaImg').src = ASSETS.dayanaNormal;
+    document.getElementById('winBrunoImg').src = ASSETS.bruno;
     launchConfetti();
+    launchWishes();
     populateChairParade();
     winOverlay.classList.remove('hidden');
     loadMessages();
@@ -1100,6 +1201,24 @@ const ASSETS = {
       if(p && p.catch) p.catch(()=> chainsawRingtone());
     } catch(e){
       chainsawRingtone();
+    }
+  }
+
+  // 🎉 piesă la finish — pune fișierul "manea.mp3" în același folder cu
+  // index.html pe GitHub, cu exact acest nume, și se va reda automat când
+  // se ajunge la petrecere. Dacă fișierul lipsește, se aude fanfara generată.
+  const winSongFile = new Audio('manea.mp3');
+  winSongFile.preload = 'auto';
+  winSongFile.volume = 0.65;
+
+  function playWinSong(){
+    if(!musicOn) return;
+    try {
+      winSongFile.currentTime = 0;
+      const p = winSongFile.play();
+      if(p && p.catch) p.catch(()=> fanfare());
+    } catch(e){
+      fanfare();
     }
   }
 
@@ -1472,6 +1591,14 @@ const ASSETS = {
       updateEffects();
       return;
     }
+    if(state === 'finish'){
+      finishTimer--;
+      updateEffects();
+      if(finishTimer <= 0){
+        win();
+      }
+      return;
+    }
     if(state !== 'playing') return;
 
     speed = baseSpeed + Math.min(obstaclesCleared/6, 6);
@@ -1553,7 +1680,7 @@ const ASSETS = {
         score += 10;
         updateHud();
         if(obstaclesCleared >= TARGET_OBSTACLES){
-          win();
+          triggerFinish();
         }
       }
     });
@@ -1647,6 +1774,32 @@ const ASSETS = {
       ctx.textBaseline = 'middle';
       ctx.fillText(d.emoji, d.x + d.w/2, d.y + d.h/2);
     });
+
+    if(state === 'finish'){
+      const bannerH = 56;
+      const bannerY = 60;
+      const squares = 26;
+      const sw = W / squares;
+      ctx.save();
+      for(let i=0;i<squares;i++){
+        ctx.fillStyle = (i % 2 === 0) ? '#FFF6E9' : '#1F1730';
+        ctx.fillRect(i*sw, bannerY, sw, bannerH);
+      }
+      ctx.restore();
+
+      const pulse = 1 + Math.sin(frame*0.28)*0.07;
+      ctx.save();
+      ctx.translate(W/2, bannerY + bannerH/2);
+      ctx.scale(pulse, pulse);
+      ctx.font = "900 40px 'Baloo 2', sans-serif";
+      ctx.fillStyle = '#F2C14E';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,.65)';
+      ctx.shadowBlur = 14;
+      ctx.fillText('🏁 FINISH! 🏁', 0, 0);
+      ctx.restore();
+    }
 
     drawBrunoAndRider(player.x, player.y - player.h);
 
