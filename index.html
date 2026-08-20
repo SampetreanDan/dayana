@@ -301,6 +301,49 @@
     border-radius:8px;
     white-space:nowrap;
   }
+
+  .marius-avatar{
+    position:absolute;
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#8B4A3E,#5E2E24);
+    border:2px solid var(--coral);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    transition:opacity .3s ease, transform .3s ease;
+    z-index:6;
+    pointer-events:none;
+  }
+  .marius-avatar .norbert-tag{
+    color:var(--coral);
+  }
+  .marius-bubble{
+    position:absolute;
+    font-family:'Baloo 2';
+    font-size:11px;
+    background:var(--cream);
+    color:var(--ink);
+    padding:6px 10px;
+    border-radius:12px;
+    max-width:150px;
+    line-height:1.3;
+    box-shadow:0 4px 10px rgba(0,0,0,.3);
+    opacity:0;
+    transition:opacity .3s ease;
+    z-index:6;
+    pointer-events:none;
+  }
+  .marius-bubble::after{
+    content:'';
+    position:absolute;
+    bottom:-8px;
+    right:20px;
+    border:6px solid transparent;
+    border-top-color:var(--cream);
+  }
 </style>
 </head>
 <body>
@@ -313,6 +356,12 @@
       <span class="norbert-tag">Norbert</span>
     </div>
     <div class="norbert-bubble" id="norbertBubble"></div>
+
+    <div class="marius-avatar" id="mariusAvatar">
+      <span class="norbert-emoji">🪚</span>
+      <span class="norbert-tag">Marius</span>
+    </div>
+    <div class="marius-bubble" id="mariusBubble"></div>
 
     <div class="hud">
       <div>
@@ -334,7 +383,6 @@
       </div>
       <button class="btn" id="startBtn">Pornește spre petrecere 🎉</button>
       <div class="hint">Apasă SPAȚIU / săgeata sus, sau atinge ecranul, ca să sari</div>
-      <div class="hint">Psst — tasta <b>P</b> aduce un mic ropot de pulpe 🍗</div>
     </div>
 
     <div class="overlay hidden" id="gameOverOverlay">
@@ -403,6 +451,8 @@ const ASSETS = {
   const winScore = document.getElementById('winScore');
   const norbertAvatar = document.getElementById('norbertAvatar');
   const norbertBubble = document.getElementById('norbertBubble');
+  const mariusAvatar = document.getElementById('mariusAvatar');
+  const mariusBubble = document.getElementById('mariusBubble');
 
   // ---------- Load images ----------
   const IMG = {};
@@ -456,6 +506,70 @@ const ASSETS = {
     if(!audioCtx || !musicOn) return;
     [523,659,784,1046].forEach((f,i)=> setTimeout(()=>playNote(f,0.3,'square',0.07), i*120));
   }
+  let chainsawNoiseBuffer = null;
+  function getChainsawNoiseBuffer(){
+    if(chainsawNoiseBuffer) return chainsawNoiseBuffer;
+    const len = audioCtx.sampleRate * 1.5;
+    chainsawNoiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = chainsawNoiseBuffer.getChannelData(0);
+    for(let i=0;i<len;i++) data[i] = Math.random()*2 - 1;
+    return chainsawNoiseBuffer;
+  }
+  function chainsawRingtone(){
+    if(!audioCtx || !musicOn) return;
+    const now = audioCtx.currentTime;
+    const dur = 1.1;
+
+    // grinding "cutting wood" texture — filtered noise
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = getChainsawNoiseBuffer();
+    noise.loop = true;
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1100, now);
+    bp.Q.value = 0.9;
+    const noiseGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.0001, now);
+    noiseGain.gain.linearRampToValueAtTime(0.07, now + 0.05);
+    noiseGain.gain.setValueAtTime(0.07, now + dur - 0.18);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    noise.connect(bp);
+    bp.connect(noiseGain);
+    noiseGain.connect(audioCtx.destination);
+
+    // engine growl — two detuned sawtooth oscillators revving up/down
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    osc1.type = 'sawtooth';
+    osc2.type = 'sawtooth';
+    const revPattern = [
+      [now,        95],
+      [now+0.12,  215],
+      [now+0.22,  140],
+      [now+0.40,  230],
+      [now+dur-0.2, 150],
+      [now+dur,     90]
+    ];
+    revPattern.forEach(([t,f])=>{
+      osc1.frequency.linearRampToValueAtTime(f, t);
+      osc2.frequency.linearRampToValueAtTime(f*1.06, t);
+    });
+    const oscGain = audioCtx.createGain();
+    oscGain.gain.setValueAtTime(0.0001, now);
+    oscGain.gain.linearRampToValueAtTime(0.10, now + 0.05);
+    oscGain.gain.setValueAtTime(0.10, now + dur - 0.18);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    osc1.connect(oscGain);
+    osc2.connect(oscGain);
+    oscGain.connect(audioCtx.destination);
+
+    noise.start(now);
+    osc1.start(now);
+    osc2.start(now);
+    noise.stop(now + dur);
+    osc1.stop(now + dur);
+    osc2.stop(now + dur);
+  }
 
   muteBtn.addEventListener('click', ()=>{
     musicOn = !musicOn;
@@ -466,7 +580,7 @@ const ASSETS = {
   let state = 'idle'; // idle | playing | resting | impact | dead | won
   let score = 0;
   let obstaclesCleared = 0;
-  const TARGET_OBSTACLES = 40;
+  const TARGET_OBSTACLES = 23;
   let speed = 6;
   let baseSpeed = 6;
   let groundY = H - 90;
@@ -474,6 +588,8 @@ const ASSETS = {
   let spawnTimer = 0;
   let dropTimer = 0;
   let norbertTimer = 200;
+  let mariusTimer = 900 + Math.random()*400;
+  let mariusVisibleTimer = 0;
 
   let coffeeBuff = 0;   // frames remaining of Bruno's coffee speed boost
   let flyMode = 0;      // frames remaining of Bruno flying
@@ -534,34 +650,21 @@ const ASSETS = {
     'Norbert a văzut. A pus deja un comment de review.',
     'Strapi a cerut un content-type nou pentru „scuze".',
     'Ai uitat un semicolon și acum plânge un dev francez.',
-    'CreateX a trimis deja un ticket despre asta.',
     'Bruno crede că a fost vina ta, nu a lui.',
     'Se putea și mai rău: puteai să dai deploy vineri seara.',
-    'Eskimoz a cerut raport SEO despre căzătura asta.',
     'Ai lovit un Titan 2. Măcar era în stoc.'
   ];
 
   const NORBERT_LINES = [
-    'Hai mai repede! 🏃',
-    'Ai văzut mail-ul meu?',
-    'Când e gata task-ul din Strapi?',
-    'Mai avem un fotoliu de tradus azi.',
-    'Eskimoz a mai trimis un raport.',
-    'Hopa, ăla-i Titan 2, ai grijă!',
-    'Bravo, așa! Continuă!',
-    'CreateX așteaptă răspunsul tău.',
-    'Ai apăsat cheat code-ul, văd io! 👀',
-    'Nu uita de review-ul de la Adrian.',
-    'Dessa te caută pe Slack.',
-    'Sari, sari, nu te opri!',
-    'Bruno aleargă mai repede ca tine la deploy.',
-    'Ăla-i un Neo Relax, ușor de sărit!',
-    'Chiar credeai că scapi de mine azi?',
-    'Fix acum vreau un update de status.',
-    'Ai grijă, urmează ceva mare din stânga.',
-    'Norbert aprobă cursa asta. 👍',
-    'Mai sunt puține fotolii, nu ceda!',
-    'Asta arată a productivitate reală!'
+    'Ce mâncăm azi?',
+    'Băgăm o manea?',
+    'Cât estimezi că o să-ți ia să faci chestia asta?',
+    'Ai văzut mailul de la Adi?',
+    'Ce mai face Bruno?',
+    'Ne cumpărăm haine?',
+    'Mi-o ieșit un bilet la pariuri',
+    'Care e piesa ta preferată?',
+    'Mergem în Obsesion?'
   ];
 
   function resetGame(){
@@ -576,6 +679,8 @@ const ASSETS = {
     dropTimer = 90;
     specialTimer = 480;
     norbertTimer = 220;
+    mariusTimer = 900 + Math.random()*400;
+    mariusVisibleTimer = 0;
     frame = 0;
     coffeeBuff = 0;
     flyMode = 0;
@@ -594,6 +699,7 @@ const ASSETS = {
     player.jumping = false;
     updateHud();
     hideNorbert();
+    hideMarius();
   }
 
   function updateHud(){
@@ -641,6 +747,7 @@ const ASSETS = {
     const titles = ['Ai căzut din șa!','Bruno a frânat brusc.','Game over, dar cu stil.','Fotoliul a câștigat runda asta.'];
     goTitle.textContent = titles[Math.floor(Math.random()*titles.length)];
     hideNorbert();
+    hideMarius();
     setTimeout(()=>{
       state = 'dead';
       if(continuesUsed < MAX_CONTINUES){
@@ -703,6 +810,7 @@ const ASSETS = {
     populateChairParade();
     winOverlay.classList.remove('hidden');
     hideNorbert();
+    hideMarius();
   }
 
   startBtn.addEventListener('click', begin);
@@ -788,6 +896,26 @@ const ASSETS = {
     norbertAvatar.style.opacity = '0';
     norbertBubble.style.opacity = '0';
     norbertVisibleTimer = 0;
+  }
+
+  function showMarius(){
+    chainsawRingtone();
+    mariusBubble.textContent = 'Scuze! Nevastă! 📞';
+    const top = 60 + Math.random()*40;
+    mariusAvatar.style.right = '8px';
+    mariusAvatar.style.left = 'auto';
+    mariusAvatar.style.top = top + 'px';
+    mariusBubble.style.right = '54px';
+    mariusBubble.style.left = 'auto';
+    mariusBubble.style.top = (top-6) + 'px';
+    mariusAvatar.style.opacity = '1';
+    mariusBubble.style.opacity = '1';
+    mariusVisibleTimer = 150;
+  }
+  function hideMarius(){
+    mariusAvatar.style.opacity = '0';
+    mariusBubble.style.opacity = '0';
+    mariusVisibleTimer = 0;
   }
 
   // ---------- Drawing helpers ----------
@@ -1015,10 +1143,10 @@ const ASSETS = {
     // Dino-game style progression: start with only the smallest chair,
     // unlock bigger ones gradually as more obstacles are cleared.
     let unlocked;
-    if(obstaclesCleared < 5) unlocked = CHAIR_TYPES.slice(0,1);        // only Corporate
-    else if(obstaclesCleared < 10) unlocked = CHAIR_TYPES.slice(0,2);  // + Neo Relax
-    else if(obstaclesCleared < 18) unlocked = CHAIR_TYPES.slice(0,3);  // + Prime
-    else if(obstaclesCleared < 28) unlocked = CHAIR_TYPES.slice(0,4);  // + Victoria 3
+    if(obstaclesCleared < 3) unlocked = CHAIR_TYPES.slice(0,1);        // only Corporate
+    else if(obstaclesCleared < 7) unlocked = CHAIR_TYPES.slice(0,2);   // + Neo Relax
+    else if(obstaclesCleared < 11) unlocked = CHAIR_TYPES.slice(0,3);  // + Prime
+    else if(obstaclesCleared < 17) unlocked = CHAIR_TYPES.slice(0,4);  // + Victoria 3
     else unlocked = CHAIR_TYPES;                                      // + Titan 2
 
     // within unlocked set, bias slightly toward the newest/hardest one
@@ -1141,7 +1269,7 @@ const ASSETS = {
     }
     if(state !== 'playing') return;
 
-    speed = baseSpeed + Math.min(obstaclesCleared/8, 6);
+    speed = baseSpeed + Math.min(obstaclesCleared/6, 6);
     if(coffeeBuff > 0) speed *= 1.25;
     player.legPhase += 0.35 * (speed/baseSpeed);
     bgOffset += speed * 0.35;
@@ -1172,7 +1300,7 @@ const ASSETS = {
     spawnTimer--;
     if(spawnTimer <= 0){
       spawnObstacle();
-      spawnTimer = Math.max(40, 92 - obstaclesCleared*1.3);
+      spawnTimer = Math.max(42, 90 - obstaclesCleared*2.4);
     }
     dropTimer--;
     if(dropTimer <= 0){
@@ -1193,6 +1321,16 @@ const ASSETS = {
     if(norbertVisibleTimer > 0){
       norbertVisibleTimer--;
       if(norbertVisibleTimer <= 0) hideNorbert();
+    }
+
+    mariusTimer--;
+    if(mariusTimer <= 0){
+      showMarius();
+      mariusTimer = 800 + Math.random()*500;
+    }
+    if(mariusVisibleTimer > 0){
+      mariusVisibleTimer--;
+      if(mariusVisibleTimer <= 0) hideMarius();
     }
 
     const playerBox = { x: player.x + 20, y: player.y - 26, w: 92, h: 42 };
